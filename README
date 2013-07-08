@@ -1,0 +1,35 @@
+Pretty much everyone who owns a Raspberry Pi has written a script to dump all
+the useful system information in one go; this one is mine.
+
+It takes no arguments and dumps the following to stdout:
+  - CPU and GPU temperatures in centigrade
+  - CPU voltage (with separate over-voltage component when present)
+  - CPU minimum, maximum and current frequencies
+  - CPU frequency governor mode and upscale threshold
+  - Hostname and any non-loopback IP addresses
+  - Firmware date and version
+  - Enabled and disabled media codecs.
+
+
+To install the script run "python ./setup.py install" with the appropriate
+privileges.
+
+-----
+
+Copyright (c) 2013
+Vrai Stacey <vrai.stacey@gmail.com>
+
+This file is part of pi-sysinfo
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation; either version 2 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place, Suite 330, Boston, MA 02111-1307 USA

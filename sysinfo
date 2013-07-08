@@ -105,11 +105,11 @@ def _ipaddrs ( ):
 
 class Output ( object ):
     def __init__ ( self, prefwidth, stream ):
-        self.__prefwidth = prefwidth
+        self.__fmt = '%%%ds : %%s\n' % prefwidth
         self.__stream = stream
 
     def write ( self, key, val ):
-        print key, val
+        self.__stream.write ( self.__fmt % ( key, val ) )
 
 if __name__ == '__main__':
     out = Output ( 16, sys.stdout )
