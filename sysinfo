@@ -1,5 +1,10 @@
 #!/usr/bin/python -t
 
+# Copyright (c) 2013 Vrai Stacey <vrai.stacey@gmail.com>
+# This file is part of pi-sysinfo. This software may be used and distributed
+# according to the terms of the GNU General Public License version 2,
+# incorporated herein by reference.
+
 # Uses libraries that are only present in Python 2.7 or better. Fail here
 # rather than on library use.
 import sys

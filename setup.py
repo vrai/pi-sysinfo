@@ -1,3 +1,8 @@
+# Copyright (c) 2013 Vrai Stacey <vrai.stacey@gmail.com>
+# This file is part of pi-sysinfo. This software may be used and distributed
+# according to the terms of the GNU General Public License version 2,
+# incorporated herein by reference.
+
 from distutils.core import setup
 
 setup (
