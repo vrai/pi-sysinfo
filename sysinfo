@@ -1,0 +1,142 @@
+#!/usr/bin/python -t
+
+# Uses libraries that are only present in Python 2.7 or better. Fail here
+# rather than on library use.
+import sys
+if sys.version_info.major == 2 and sys.version_info.minor < 7:
+    sys.stderr.write ( 'Requires Python 2.7 or higher.\n' )
+    sys.exit ( -1 )
+
+import math, re, subprocess
+
+_gpuoutex = re.compile ( r"temp=([0-9\.]+)'C" )
+_voltoutex = re.compile ( r'volt=([0-9\.]+)V' )
+_codecoutex = re.compile ( r'[^=]+=([a-z]+)' )
+_firmoutex = re.compile ( r'version\s+(.+)' )
+_ipoutex = re.compile ( r'inet\s+addr:\s*([0-9\.]+)\s+' )
+
+_codecs = ( 'H264', 'MPG2', 'WVC1', 'MPG4', 'MJPG', 'WMV9' )
+
+def _fatal ( msg ):
+    sys.stderr.write ( '%s\n' % msg )
+    sys.exit ( -1 )
+
+def _readfile ( fn ):
+    try:
+        return open ( fn, 'rb' ).readlines ( )
+    except IOError, err:
+        _fatal ( 'Failed to open "%s": %s\n' % ( fn, err ) )
+
+def _runsubproc ( *args ):
+    try:
+        proc = subprocess.Popen ( args, stdout = subprocess.PIPE )
+        return proc.communicate ( ) [ 0 ]
+    except Exception, err:
+        _fatal ( 'Failed to exec "%s": %s\n' % (
+            ' '.join ( map ( str, args ) ), err ) )
+
+def _runvcgencmd ( outex, *args ):
+    out = _runsubproc ( '/opt/vc/bin/vcgencmd', *args )
+    match = outex.match ( out )
+    if not match:
+        _fatal ( 'Cannot parse vcgencmd output "%s"' % out )
+    return match.group ( 1 )
+
+def _cputemp ( ):
+    val = int ( _readfile (
+        '/sys/class/thermal/thermal_zone0/temp' ) [ 0 ].strip ( ) )
+    return val / 1000.0
+
+def _gputemp ( ):
+    return float ( _runvcgencmd ( _gpuoutex, 'measure_temp' ) )
+
+def _corevolts ( ):
+    return float ( _runvcgencmd ( _voltoutex, 'measure_volts', 'core' ) )
+
+def _overvolts ( cur, std = 1.2 ):
+    diff = math.fabs ( cur - std )
+    if diff > 0.01:
+        return cur - std
+
+def _cpufreqs ( ):
+    return tuple (
+        int ( _readfile (
+            '/sys/devices/system/cpu/cpu0/cpufreq/scaling_%s_freq' % mode )
+                [ 0 ].strip ( ) ) / 1000
+        for mode in ( 'min', 'cur', 'max' ) )
+
+def _cpugovenor ( ):
+    return _readfile (
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+            ) [ 0 ].strip ( )
+
+def _cputhreshold ( ):
+    return int ( _readfile (
+        '/sys/devices/system/cpu/cpufreq/ondemand/up_threshold' )
+            [ 0 ].strip ( ) )
+
+def _codecstat ( ):
+    return {
+        codec.lower ( ) :
+            _runvcgencmd ( _codecoutex, 'codec_enabled', codec ) == 'enabled'
+        for codec in _codecs }
+
+def _firmware ( ):
+    lines = [ line.strip ( ) for line in
+        _runsubproc ( '/opt/vc/bin/vcgencmd', 'version'
+            ).strip ( ).split ( '\n' ) ]
+    if len ( lines ) != 3:
+        _fatal ( 'Expect 3 lines in version output got %d' % len ( lines ) )
+    match = _firmoutex.match ( lines [ 2 ] )
+    if not match:
+        fatal ( 'Cannot parse final version line "%s"' % lines [ 2 ] )
+    return '%s; %s' % ( lines [ 0 ], match.group ( 1 ) )
+
+def _hostname ( ):
+    return _runsubproc ( 'hostname' ).strip ( )
+
+def _ipaddrs ( ):
+    addrs = set ( )
+    for line in _runsubproc ( '/sbin/ifconfig' ).split ( '\n' ):
+        match = _ipoutex.match ( line.strip ( ) )
+        if match and match.group ( 1 ) != '127.0.0.1':
+            addrs.add ( match.group ( 1 ) )
+    return addrs
+
+class Output ( object ):
+    def __init__ ( self, prefwidth, stream ):
+        self.__prefwidth = prefwidth
+        self.__stream = stream
+
+    def write ( self, key, val ):
+        print key, val
+
+if __name__ == '__main__':
+    out = Output ( 16, sys.stdout )
+    out.write ( 'CPU temp', '%.2fC' % _cputemp ( ) )
+    out.write ( 'GPU temp', '%.2fC' % _gputemp ( ) )
+
+    cpuvolts = _corevolts ( )
+    overvolts = _overvolts ( cpuvolts )
+    out.write ( 'Voltage',
+        '%.2fv (%.2fv over)' % ( cpuvolts, overvolts ) if overvolts else
+        '%.2fv' % cpuvolts )
+
+    freqs = _cpufreqs ( )
+    out.write ( 'CPU freq range', '%d -> %d' % ( freqs [ 0 ], freqs [ 2 ] ) )
+    out.write ( 'CPU freq', '%d' % freqs [ 1 ] )
+    out.write ( 'Governor', '%s (threshold %d%%)' % (
+        _cpugovenor ( ), _cputhreshold ( ) ) )
+
+    ipaddrs = _ipaddrs ( )
+    out.write ( 'Hostname', _hostname ( ) )
+    out.write ( 'IP addresses', ' '.join ( ipaddrs ) if ipaddrs else 'NONE' )
+
+    codecs = _codecstat ( )
+    out.write ( 'Firmware', _firmware ( ) )
+    out.write ( 'Codecs enbld',
+        ' '.join ( x for x in codecs if codecs.get ( x ) ) )
+    out.write ( 'Codecs disbld',
+        ' '.join ( x for x in codecs if not codecs.get ( x ) ) )
+
+# vim: ft=python:sw=4:ts=4:et
